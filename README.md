@@ -10,7 +10,13 @@ The S3 bucket is configured to use Origin Access Control (OAC) which means the S
 
 The CloudFront distribution will also override 404 requests to serve the `/index.html` which enables front-end routing.
 
-### How to deploy the CloudFormation template
+### One click deployment
+
+Use this **[One Click Deployment link](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=static-website&templateURL=https://s3.amazonaws.com/tadmatic-templates/aws-static-website/aws-static-website.yaml)** to open the AWS CloudFormation console.
+
+### Manually deploy the CloudFormation template
+
+Alternatively you can do the following:
 
 1. Login to AWS console
 2. Navigate to CloudFormation and click `Create Stack`
