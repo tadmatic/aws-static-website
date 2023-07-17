@@ -66,7 +66,7 @@ Outputs:
     Value: !Join
       - ''
       - - 's3://'
-        - Bucket
+        - !Ref Bucket
 
   DistributionId:
     Description: CloudFront Distribution ID
