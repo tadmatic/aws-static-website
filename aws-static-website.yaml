@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  BucketName:
+    Type: String
+    Description: The name of the S3 bucket that will store the static website files. Note this must be a globally unique name. 
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      AccessControl: Private
+
+  OAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Name: !GetAtt Bucket.RegionalDomainName
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+          TargetOriginId: !Ref BucketName
+          ViewerProtocolPolicy: redirect-to-https
+          ForwardedValues:
+            Cookies:
+              Forward: none
+            QueryString: false
+        DefaultRootObject: index.html
+        Enabled: true
+        Origins:
+          - DomainName: !GetAtt Bucket.RegionalDomainName
+            Id: !Ref BucketName
+            OriginAccessControlId: !GetAtt OAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+  
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BucketName
+      PolicyDocument:
+        Statement:
+          Action:
+            - s3:GetObject
+          Effect: Allow
+          Principal: 
+            Service: 
+              - cloudfront.amazonaws.com
+          Resource: !Sub "arn:aws:s3:::${BucketName}/*"
+          Condition: 
+            StringEquals:
+              AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+
+Outputs:
+  S3BucketURI:
+    Description: S3 Bucket URI
+    Value: !Join
+      - ''
+      - - 's3://'
+        - Bucket
+
+  DistributionId:
+    Description: CloudFront Distribution ID
+    Value: !Ref Distribution
+  
+  CloudFrontWebsite:
+    Description: CloudFront Website URL
+    Value: !Join
+      - ''
+      - - 'https://'
+        - !GetAtt Distribution.DomainName
