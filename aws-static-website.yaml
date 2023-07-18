@@ -34,6 +34,13 @@ Resources:
             Cookies:
               Forward: none
             QueryString: false
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html  
         DefaultRootObject: index.html
         Enabled: true
         Origins:
