@@ -15,7 +15,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties: 
       OriginAccessControlConfig:
-        Name: !GetAtt Bucket.RegionalDomainName
+        Name: !Ref BucketName
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
