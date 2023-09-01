@@ -1,11 +1,39 @@
 AWSTemplateFormatVersion: 2010-09-09
+
 Parameters:
   BucketName:
     Type: String
-    Description: The name of the S3 bucket that will store the static website files. Note this must be a globally unique name. 
+    Description: The name of the S3 bucket to store website files.
+
+  UseExistingBucket:
+    Type: String
+    Default: "No"
+    AllowedValues:
+      - "Yes"
+      - "No"
+    Description: Is the bucket an existing S3 bucket? If "No", a new one will be created.
+
+  DomainName:
+    Type: String
+    Default: ""
+    Description: OPTIONAL - The domain name for your website (e.g., example.com).
+
+  HostedZoneId:
+    Type: String
+    Description: OPTIONAL - The hosted zone to add DNS records to (required if DomainName is configured).
+
+  AcmCertificateArn:
+    Type: String
+    Default: ""
+    Description: OPTIONAL - The ARN for your ACM certificate for the domain (required if DomainName is configured).
+
+Conditions:
+  CreateNewBucket: !Equals [!Ref UseExistingBucket, "No"]
+  UseCustomDomain: !Not [!Equals [!Ref DomainName, ""]]
 
 Resources:
   Bucket:
+    Condition: CreateNewBucket
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Ref BucketName
@@ -24,6 +52,13 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Aliases: !If [UseCustomDomain, [!Ref DomainName], !Ref AWS::NoValue]
+        ViewerCertificate:
+          !If 
+            - UseCustomDomain
+            - AcmCertificateArn: !Ref AcmCertificateArn
+              SslSupportMethod: 'sni-only'
+            - CloudFrontDefaultCertificate: true
         DefaultCacheBehavior:
           AllowedMethods:
             - GET
@@ -44,12 +79,12 @@ Resources:
         DefaultRootObject: index.html
         Enabled: true
         Origins:
-          - DomainName: !GetAtt Bucket.RegionalDomainName
+          - DomainName: !If [CreateNewBucket, !GetAtt Bucket.RegionalDomainName, !Ref BucketName]
             Id: !Ref BucketName
             OriginAccessControlId: !GetAtt OAC.Id
             S3OriginConfig:
               OriginAccessIdentity: ""
-  
+
   BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -62,18 +97,26 @@ Resources:
           Principal: 
             Service: 
               - cloudfront.amazonaws.com
-          Resource: !Sub "arn:aws:s3:::${BucketName}/*"
+          Resource: !Sub "arn:${AWS::Partition}:s3:::${BucketName}/*"
           Condition: 
             StringEquals:
-              AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+              AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+
+  Route53Record:
+    Condition: UseCustomDomain
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: CNAME
+      TTL: '300'
+      ResourceRecords:
+        - !GetAtt Distribution.DomainName
 
 Outputs:
   S3BucketURI:
     Description: S3 Bucket URI
-    Value: !Join
-      - ''
-      - - 's3://'
-        - !Ref Bucket
+    Value: !Sub "s3://${BucketName}"
 
   DistributionId:
     Description: CloudFront Distribution ID
@@ -81,7 +124,4 @@ Outputs:
   
   CloudFrontWebsite:
     Description: CloudFront Website URL
-    Value: !Join
-      - ''
-      - - 'https://'
-        - !GetAtt Distribution.DomainName
+    Value: !Sub "https://${Distribution.DomainName}"
